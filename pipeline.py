@@ -33,7 +33,7 @@ def main():
 
     # Список скриптов для выполнения
     scripts = [
-        "dataread.py",
+        "read_from_yahoo.py",
         "read_from_tinkoff.py",
         "make_countries.py",
         "calculation.py",
@@ -43,11 +43,12 @@ def main():
     # Запускаем каждый скрипт
     for script in scripts:
         if script == "final_table.py":
-            run_script(script, date_arg)  # Передаем дату только в final_table.py
+            run_script(script, date_arg)  # Передаем дату в final_table.py
         else:
             run_script(script)
 
     print("Пайплайн успешно завершен.")
+
 
 if __name__ == "__main__":
     main()
