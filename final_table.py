@@ -1,11 +1,44 @@
 import sqlite3
-import pandas as pd
-from openpyxl.styles import PatternFill
-from openpyxl.utils.dataframe import dataframe_to_rows
-from openpyxl import Workbook
 import sys
 from datetime import datetime
 
+import pandas as pd
+from openpyxl import Workbook
+from openpyxl.styles import PatternFill
+from openpyxl.utils.dataframe import dataframe_to_rows
+
+# Список выбранных тикеров
+selected_tickers = ['IMOEX',
+                    'RGBI',
+                    'X5',
+                    'SBER',
+                    'T',
+                    '9618.HK',
+                    '3798.HK',
+                    '9988.HK',
+                    '9888.HK',
+                    '0219.HK',
+                    'UGLD',
+                    '2127.HK',
+                    '2007.HK',
+                    'NBIS',
+                    'TMF',
+                    'TLT']  # Замените на ваши тикеры
+with open('cherry.txt','r') as cherry:
+    cherries = [line.strip().split() for line in cherry.readlines()]
+
+    cherry_list=[]
+    for cherry in cherries:
+        if cherry[1] == 'RU':
+            name = cherry[2] + cherry[0]
+            cherry_list.append(name)
+        elif cherry[1] == 'US':
+            name = cherry[2]
+            cherry_list.append(name)
+selected_tickers += cherry_list
+
+
+print(selected_tickers)
 # Подключение к БД
 conn = sqlite3.connect("stocks.db")
 
@@ -20,8 +53,18 @@ data = pd.read_sql(query, conn)
 # Закрываем соединение с БД
 conn.close()
 
+conn = sqlite3.connect("indices.db")
+query = """
+SELECT *
+FROM indices_analysis
+"""
+indices_data = pd.read_sql(query, conn)
+conn.close()
+
+
 # Преобразуем столбец `date` в формат datetime
 data["date"] = pd.to_datetime(data["date"])
+indices_data["date"] = pd.to_datetime(indices_data["date"])
 
 # Проверяем, передан ли аргумент даты
 if len(sys.argv) > 1:
@@ -33,29 +76,55 @@ if len(sys.argv) > 1:
         print("Неверный формат даты. Используйте формат DD-MM-YY.")
         sys.exit(1)
 else:
-    selected_date=datetime.today().strftime("%Y-%m-%d")
+    selected_date = datetime.today().strftime("%Y-%m-%d")
 
 # Фильтруем данные по выбранной дате
 filtered_data = data[data["date"] == selected_date]
+filtered_indices = indices_data[indices_data["date"] == selected_date]
 
-order=['Index', 'RU', 'US', 'EU', 'HongKong']
-filtered_data["country"] = pd.Categorical(filtered_data["country"], categories=order, ordered=True)
+# Объединяем данные из `filtered_data` и `filtered_indices`
+# Используем `ticker` как ключ для объединения
 
-filtered_data = filtered_data.sort_values(by="country")
-# filtered_data = data[data["country"]=="RU"]
-# print(filtered_data)
+# Удаляем ненужные столбцы из `data`
+columns_to_drop = ['open', 'high', 'low', 'volume', 'ISA_9', 'ISB_26', 'ITS_9', 'IKS_26','id','obv','obv_sma_21']
+data_cleaned = filtered_data.drop(columns=columns_to_drop)
+
+# Добавляем недостающие столбцы в `filtered_indices`
+filtered_indices['cloud_flag'] = 0  # Добавляем столбец cloud_flag со значением 0
+filtered_indices['obv_flag'] = 0    # Добавляем столбец obv_flag со значением 0
+filtered_indices['country'] = 'ru_index'  # Добавляем столбец country со значением 'ru_index'
+
+# Приводим столбцы filtered_indices к тому же порядку, что и в data_cleaned
+filtered_indices = filtered_indices[data_cleaned.columns]
+
+
+
+# Объединяем таблицы с помощью pd.concat
+merged_data = pd.concat([data_cleaned, filtered_indices], ignore_index=True)
+
+# Проверяем результат
+print(merged_data.head(10))
+print(merged_data[merged_data['ticker'] == 'UPROElvis144'].head(10))
+
+# Упорядочиваем данные по странам
+order = ['Index', 'RU', 'US', 'EU', 'HongKong','ru_index']
+merged_data["country"] = pd.Categorical(merged_data["country"], categories=order, ordered=True)
+merged_data = merged_data.sort_values(by="country")
+
+
+
 # Создаем таблицу с флагами
-flags_table = filtered_data[["ticker",
-                             "country",
-                             "close",
-                             "ema_7",
-                             "rsi_14",
-                             "rsi_flag",
-                             "sma_flag",
-                             "macd_flag",
-                             "obv_flag",
-                             "ema_flag",
-                             "cloud_flag"]]
+flags_table = merged_data[["ticker",
+                           "country",
+                           "close",
+                           "ema_7",
+                           "rsi_14",
+                           "rsi_flag",
+                           "sma_flag",
+                           "macd_flag",
+                           "obv_flag",
+                           "ema_flag",
+                           "cloud_flag"]]
 
 # Добавляем столбец с суммой флагов
 flags_table["total_flags"] = (
@@ -85,7 +154,7 @@ red_fill = PatternFill(start_color="FF0000", end_color="FF0000", fill_type="soli
 
 # Раскрашиваем строки в зависимости от значения `total_flags`
 for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
-    total_flags = row[11].value  # Столбец `total_flags`индексация с 0
+    total_flags = row[11].value  # Столбец `total_flags` индексация с 0
     if total_flags is not None:
         if total_flags > 2:
             for cell in row:
@@ -93,7 +162,6 @@ for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=1, max_col=ws.max
         elif total_flags < -2:
             for cell in row:
                 cell.fill = red_fill  # Красный для total_flags < -2
-
 
 # Группируем данные по стране и считаем сумму total_flags для каждой страны
 country_flags_sum = flags_table.groupby("country")["total_flags"].sum().reset_index()
@@ -116,8 +184,30 @@ ws_summary = wb.create_sheet(title="Country Flags Summary")
 for r in dataframe_to_rows(summary_table, index=False, header=True):
     ws_summary.append(r)
 
+# Фильтруем данные по выбранным тикерам
+selected_tickers_data = flags_table[flags_table['ticker'].isin(selected_tickers)]
+print(selected_tickers_data[selected_tickers_data['ticker'] == 'UPROElvis144'].head(10))
+print(selected_tickers)
+# Создаем новый лист в Excel-файле для выбранных тикеров
+ws_selected_tickers = wb.create_sheet(title="Selected Tickers")
+
+# Записываем данные в новый лист
+for r in dataframe_to_rows(selected_tickers_data, index=False, header=True):
+    ws_selected_tickers.append(r)
+
+# Раскрашиваем строки в зависимости от значения `total_flags`
+for row in ws_selected_tickers.iter_rows(min_row=2, max_row=ws_selected_tickers.max_row, min_col=1, max_col=ws_selected_tickers.max_column):
+    total_flags = row[11].value  # Столбец `total_flags` индексация с 0
+    if total_flags is not None:
+        if total_flags > 2:
+            for cell in row:
+                cell.fill = green_fill  # Зеленый для total_flags > 2
+        elif total_flags < -2:
+            for cell in row:
+                cell.fill = red_fill  # Красный для total_flags < -2
+
 
 # Сохраняем файл
-output_file = f"flags_table_{selected_date}_colored.xlsx"
+output_file = f"Stocks_analisys/flags_table_{selected_date}_colored.xlsx"
 wb.save(output_file)
 print(f"Таблица сохранена в файл {output_file}")

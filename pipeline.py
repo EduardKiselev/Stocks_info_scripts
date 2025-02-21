@@ -1,3 +1,4 @@
+import sqlite3
 import subprocess
 import sys
 from datetime import datetime
@@ -27,16 +28,26 @@ def main():
             print("Неверный формат даты. Используйте формат DD-MM-YY.")
             sys.exit(1)
     else:
-        # Если дата не передана, используем текущую дату
-        date_arg = datetime.now().strftime("%d-%m-%y")
-        print(f"Дата не передана. Используется текущая дата: {date_arg}")
+        # Функция для получения последней даты в таблице
+        conn = sqlite3.connect("stocks.db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT MAX(date) FROM russia_stocks")
+        result = cursor.fetchone()
+        if result and result[0]:
+            date_arg = datetime.fromisoformat(result[0]).strftime("%d-%m-%y")
+            print(f"Дата не передана. Используется последняя дата: {date_arg}")
+        else:
+            print("Не могу найти последнюю дату.")
+            return 
 
     # Список скриптов для выполнения
     scripts = [
         "read_from_yahoo.py",
         "read_from_tinkoff.py",
         "make_countries.py",
+        "moex_download_indexes.py",
         "calculation.py",
+        "indeces_calculation.py",
         "final_table.py"
     ]
 

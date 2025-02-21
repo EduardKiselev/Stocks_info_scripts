@@ -1,11 +1,12 @@
-from tinkoff.invest import Client, CandleInterval 
-from tinkoff.invest.utils import now 
-import pandas as pd 
-import sqlite3
-from datetime import datetime, timedelta
+import numpy
+import pandas as pd
 import os
-from dotenv import load_dotenv 
-
+from datetime import datetime, timedelta
+from tinkoff.invest import CandleInterval, Client
+from tinkoff.invest.utils import now
+import sqlite3
+from dotenv import load_dotenv
+import pprint
 # Загрузка переменных окружения
 load_dotenv()
 TOKEN = os.environ['TOKEN']
@@ -56,18 +57,17 @@ def get_daily_candles(figi, ticker, days=500):
         if last_date:
             # Удаляем данные за последнюю дату
             delete_last_date(ticker, last_date)
-            from_date = last_date + timedelta(days=1) 
+            from_date = last_date + timedelta(days=1)
         else:
             # Если данных нет, начинаем с 2023-01-01
             from_date = datetime(2023, 1, 1)
 
         # Ограничиваем период 500 днями
         to_date = min(from_date + timedelta(days=days),
-                      now().replace(tzinfo=None))
-
+                      now().replace(tzinfo=None)+timedelta(days=1))
         # Проверяем, что to_date > from_date
-        if to_date < from_date:
-            print(f"Нет новых данных для тикера {ticker}.")
+        if to_date.day < from_date.day:
+            print(f"Нет новых данных для тикера {ticker}.",to_date.day,from_date.day)
             return None
 
         # Получаем дневные свечи
@@ -77,6 +77,7 @@ def get_daily_candles(figi, ticker, days=500):
             to=to_date,
             interval=CandleInterval.CANDLE_INTERVAL_DAY,
         )
+
         # Преобразуем свечи в DataFrame
         data = []
         for candle in candles.candles:
@@ -104,9 +105,17 @@ def save_to_db(df, ticker):
 
 
 # Чтение FIGI и тикеров из файла
-with open('figi.txt', 'r') as file:
+with open('figi.txt', 'r') as file, open('cherry.txt', 'r') as cherry:
     tickers = [line.strip().split() for line in file.readlines()]
+    cherries = [line.strip().split() for line in cherry.readlines()]
 
+    cherry_list=[]
+    for cherry in cherries:
+        if cherry[1] == 'RU':
+            name = cherry[2] + cherry[0]
+            figi = cherry[3]
+            cherry_list.append([name, figi])
+    tickers += cherry_list
 # Обработка каждого тикера
 for ticker, figi in tickers:
     print(f"Обработка тикера: {ticker} (FIGI: {figi})")

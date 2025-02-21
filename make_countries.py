@@ -1,11 +1,10 @@
 import sqlite3
 
-
 tickers = []
 # Создаем словарь для хранения тикеров и стран
 ticker_country = {}
 
-with open("tickers.txt", "r") as file:
+with open("yahoo_tickers.txt", "r") as file:
     for line in file.readlines():
         ticker = line.strip().split()[0]
         tickers.append(ticker)

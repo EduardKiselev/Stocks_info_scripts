@@ -1,7 +1,8 @@
-import yfinance as yf
 import sqlite3
+from datetime import datetime, timedelta
+
 import pandas as pd
-from datetime import datetime,timedelta
+import yfinance as yf
 
 # Подключение к БД
 conn = sqlite3.connect("stocks.db")
@@ -9,9 +10,18 @@ cursor = conn.cursor()
 
 # Чтение списка тикеров
 tickers = []
-with open("tickers.txt", "r") as file:
+with open("yahoo_tickers.txt", "r") as file:
     for line in file.readlines():
         tickers.append(line.strip().split()[0])
+with open('cherry.txt','r') as cherry:
+    cherries = [line.strip().split() for line in cherry.readlines()]
+
+cherry_list=[]
+for cherry in cherries:
+    if cherry[1] == 'US':
+        ticker = cherry[2]
+        cherry_list.append(ticker)
+tickers += cherry_list
 
 # Текущая дата
 today = datetime.today().strftime("%Y-%m-%d")
