@@ -1,7 +1,7 @@
 import sqlite3
 import time
 from datetime import datetime, timedelta
-
+import pprint
 import requests
 
 # Список интересующих индексов
@@ -10,6 +10,10 @@ indices = [
     "RURPLRUBTR", "RURPLTR", "MREDC", "RUGBICP10Y", "RUGBICP1Y", 
     "RUGBICP3Y", "RUGBICP5Y"
 ]
+
+currencies = ["CNYRUB_TOM", ] # https://iss.moex.com/iss/history/engines/currency/markets/selt/boards/CETS/securities/CNYRUB_TOM.json?from=2023-01-01&till=2025-02-01
+futures = ["USDRUBF"]    # https://iss.moex.com/iss/history/engines/futures/markets/forts/boards/RFUD/securities/USDRUBF.json?from=2024-01-01&till=2024-10-01
+
 
 # Функция для создания таблиц, если они отсутствуют
 def create_tables_if_not_exist(conn):
@@ -52,6 +56,32 @@ def fetch_index_data(index, start_date, end_date):
             return data['history']['data']
     return None
 
+def fetch_currencies_data(curr, start_date, end_date):
+    url = f"https://iss.moex.com/iss/history/engines/currency/markets/selt/boards/CETS/securities/{curr}.json"
+    params = {
+        "from": start_date,
+        "till": end_date,
+    }
+    response = requests.get(url, params=params)
+    if response.status_code == 200:
+        data = response.json()
+        if data and 'history' in data and 'data' in data['history']:
+            return data['history']['data']
+    return None
+
+def fetch_futures_data(curr, start_date, end_date):
+    url = f"https://iss.moex.com/iss/history/engines/futures/markets/forts/boards/RFUD/securities/{curr}.json"
+    params = {
+        "from": start_date,
+        "till": end_date,
+    }
+    response = requests.get(url, params=params)
+    if response.status_code == 200:
+        data = response.json()
+        if data and 'history' in data and 'data' in data['history']:
+            return data['history']['data']
+    return None
+
 # Функция для получения последней даты для индекса из базы данных
 def get_last_date_for_index(conn, index):
     cursor = conn.cursor()
@@ -83,6 +113,29 @@ def insert_data(conn, index, data):
         ''', (index, date, value))
     conn.commit()
 
+def insert_currencies_data(conn, curr, data):
+    cursor = conn.cursor()
+    for entry in data:
+        date = entry[1] 
+        value = entry[7]
+        cursor.execute('''
+            INSERT OR REPLACE INTO index_data (ticker, date, value)
+            VALUES (?, ?, ?)
+        ''', (curr, date, value))
+    conn.commit()
+
+def insert_futures_data(conn, fut, data):
+    cursor = conn.cursor()
+    for entry in data:
+        date = entry[1] 
+        value = entry[6]
+        cursor.execute('''
+            INSERT OR REPLACE INTO index_data (ticker, date, value)
+            VALUES (?, ?, ?)
+        ''', (fut, date, value))
+    conn.commit()
+
+
 
 def insert_name(conn, index, name, currency):
     cursor = conn.cursor()
@@ -95,37 +148,25 @@ def insert_name(conn, index, name, currency):
 
 # Основная функция для обновления данных
 def main():
-    db_path = "indices.db"  # Путь к вашей базе данных
+    db_path = "stocks.db"  # Путь к вашей базе данных
     conn = sqlite3.connect(db_path)
-
-    # Создаем таблицы, если они отсутствуют
     create_tables_if_not_exist(conn)
 
-    # Начальная дата по умолчанию
     default_start_date = "2023-01-01"
 
     for index in indices:
-        print(f"Processing {index}...",end=" ")
-
-        # Получаем последнюю дату для индекса из базы данных
+        print(f"INDECES Processing {index}...",end=" ")
         last_date = get_last_date_for_index(conn, index)
-
-        # Определяем дату начала запроса
         if last_date:
-            # Если данные за последнюю дату уже есть, удаляем их
             delete_data_for_date(conn, index, last_date)
             start_date = last_date
         else:
-            # Если данных нет, используем начальную дату по умолчанию
             start_date = default_start_date
-
-        # Вычисляем конечную дату (50 дней вперед)
         end_date = (datetime.strptime(start_date, "%Y-%m-%d") + timedelta(days=50)).strftime("%Y-%m-%d")
         print("Start date:", start_date, "End date:", end_date)
         # Запрашиваем данные
         data = fetch_index_data(index, start_date, end_date)
         if data:
-            # print(f"Data found for {index}, inserting into database...")
             name = data[0][4]
             ticker = data[0][1]
             currency = data[0][14]
@@ -133,9 +174,43 @@ def main():
             insert_data(conn, index, data)
         else:
             print(f"No data found for {index}.")
-
-        # Задержка на 1/2 секунды после запроса
         time.sleep(0.5)
+
+    for curr in currencies:
+        print(f"CURR Processing {curr}...")
+        last_date = get_last_date_for_index(conn, curr)
+        if last_date:
+            delete_data_for_date(conn, curr, last_date)
+            start_date = last_date
+        else:
+            start_date = default_start_date
+        end_date = (datetime.strptime(start_date, "%Y-%m-%d") + timedelta(days=50)).strftime("%Y-%m-%d")
+
+        print("Start date:", start_date, "End date:", end_date)
+        data = fetch_currencies_data(curr, start_date, end_date)
+        if data:
+            insert_currencies_data(conn, curr, data)
+        else:
+            print(f"No data for Curr found: {curr}.")
+        time.sleep(0.5)
+
+    for fut in futures:
+        print(f"FUTURES Processing Futures {fut}...")
+        last_date = get_last_date_for_index(conn, fut)
+        if last_date:
+            delete_data_for_date(conn, curr, last_date)
+            start_date = last_date
+        else:
+            start_date = default_start_date
+        end_date = (datetime.strptime(start_date, "%Y-%m-%d") + timedelta(days=50)).strftime("%Y-%m-%d")
+
+        print("Start date:", start_date, "End date:", end_date)
+        data = fetch_futures_data(fut, start_date, end_date)
+        if data:
+            insert_futures_data(conn, fut, data)
+        else:
+            print(f"No data for fut found: {fut}.")
+        time.sleep(0.5)    
 
     conn.close()
 

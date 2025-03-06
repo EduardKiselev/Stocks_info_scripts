@@ -5,7 +5,7 @@ import pandas as pd
 import pandas_ta as ta
 
 # Подключение к БД
-conn = sqlite3.connect("indices.db")
+conn = sqlite3.connect("stocks.db")
 
 # Чтение данных из таблицы `indices`
 query_indices = "SELECT date, ticker, value as close FROM index_data"
@@ -90,7 +90,7 @@ for ticker in data_indices["ticker"].unique():
 results_df = pd.concat(results)
 
 # Сохраняем результаты в новую таблицу `indices_analysis`
-conn = sqlite3.connect("indices.db")
+conn = sqlite3.connect("stocks.db")
 results_df.to_sql("indices_analysis", conn, if_exists="replace", index=False)
 conn.close()
 

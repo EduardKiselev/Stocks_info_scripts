@@ -23,7 +23,13 @@ selected_tickers = ['IMOEX',
                     '2007.HK',
                     'NBIS',
                     'TMF',
-                    'TLT']  # Замените на ваши тикеры
+                    'TLT',
+                    'CNYRUB_TOM',
+                    'USDRUBF',
+                    '^GSPC',
+                    '^IXIC',
+                    '^DJI']
+
 with open('cherry.txt','r') as cherry:
     cherries = [line.strip().split() for line in cherry.readlines()]
 
@@ -50,10 +56,6 @@ LEFT JOIN countries c ON da.ticker = c.ticker
 """
 data = pd.read_sql(query, conn)
 
-# Закрываем соединение с БД
-conn.close()
-
-conn = sqlite3.connect("indices.db")
 query = """
 SELECT *
 FROM indices_analysis
@@ -101,10 +103,6 @@ filtered_indices = filtered_indices[data_cleaned.columns]
 
 # Объединяем таблицы с помощью pd.concat
 merged_data = pd.concat([data_cleaned, filtered_indices], ignore_index=True)
-
-# Проверяем результат
-print(merged_data.head(10))
-print(merged_data[merged_data['ticker'] == 'UPROElvis144'].head(10))
 
 # Упорядочиваем данные по странам
 order = ['Index', 'RU', 'US', 'EU', 'HongKong','ru_index']
@@ -186,12 +184,11 @@ for r in dataframe_to_rows(summary_table, index=False, header=True):
 
 # Фильтруем данные по выбранным тикерам
 selected_tickers_data = flags_table[flags_table['ticker'].isin(selected_tickers)]
-print(selected_tickers_data[selected_tickers_data['ticker'] == 'UPROElvis144'].head(10))
-print(selected_tickers)
-# Создаем новый лист в Excel-файле для выбранных тикеров
+
+print("SELECTED_TICKERS: " + selected_tickers)
+
 ws_selected_tickers = wb.create_sheet(title="Selected Tickers")
 
-# Записываем данные в новый лист
 for r in dataframe_to_rows(selected_tickers_data, index=False, header=True):
     ws_selected_tickers.append(r)
 
@@ -206,8 +203,6 @@ for row in ws_selected_tickers.iter_rows(min_row=2, max_row=ws_selected_tickers.
             for cell in row:
                 cell.fill = red_fill  # Красный для total_flags < -2
 
-
-# Сохраняем файл
-output_file = f"Stocks_analisys/flags_table_{selected_date}_colored.xlsx"
+output_file = "Stocks_analisys/final_table_"+str(selected_date.strftime("%Y-%m-%d"))+".xlsx"
 wb.save(output_file)
 print(f"Таблица сохранена в файл {output_file}")

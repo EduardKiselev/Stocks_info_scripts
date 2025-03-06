@@ -10,7 +10,9 @@ CSV_FILE = 'IRUS_M2_indicator.csv'
 TABLE_NAME = os.path.splitext(os.path.basename(CSV_FILE))[0]
 
 # Подключение к SQLite базе данных (если файла нет, он будет создан)
-conn = sqlite3.connect('stocks.db')
+parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+db_path = os.path.join(parent_dir, 'stocks.db')
+conn = sqlite3.connect(db_path)
 cursor = conn.cursor()
 
 # Чтение CSV файла в DataFrame

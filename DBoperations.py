@@ -6,7 +6,7 @@ cursor = conn.cursor()
 
 
 cursor.execute("""
-DELETE FROM russia_stocks where ticker='T';
+DELETE FROM index_data where value='CNYRUB_TOM';
 """)
 
 # Сохранение изменений

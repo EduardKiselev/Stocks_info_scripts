@@ -66,7 +66,7 @@ def get_daily_candles(figi, ticker, days=500):
         to_date = min(from_date + timedelta(days=days),
                       now().replace(tzinfo=None)+timedelta(days=1))
         # Проверяем, что to_date > from_date
-        if to_date.day < from_date.day:
+        if to_date < from_date:
             print(f"Нет новых данных для тикера {ticker}.",to_date.day,from_date.day)
             return None
 
