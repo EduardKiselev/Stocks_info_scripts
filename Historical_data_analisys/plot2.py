@@ -8,7 +8,7 @@ df = pd.read_csv("temp.csv")
 df['extra_sum'] = df['extra-FRED_NFCI'] + df['extra-SP_SPX_(TVC_US03Y+3.5-0.5_ECONOMICS_USGDPYY)_ECONOMICS_USM2_10000000000'] + df['extra-MULTPL_SP500_PE_RATIO_MONTH']+df['cloud_flag']
 df['cross_sum'] = df['cross-FRED_NFCI'] + df['cross-SP_SPX_(TVC_US03Y+3.5-0.5_ECONOMICS_USGDPYY)_ECONOMICS_USM2_10000000000'] + df['cross-MULTPL_SP500_PE_RATIO_MONTH']+df['cloud_flag']
 
-
+df['time'] = pd.to_datetime(df['time'])
 
 # Основной график
 fig, ax1 = plt.subplots(figsize=(12, 6))
@@ -99,12 +99,12 @@ plt.title("Дополнительные метрики (extra-...) с суммо
 #         color='tab:blue', label='FRED_NFCI')
 
 # Вторая ось (правая) - extra-SP_SPX
-# ax2 = ax.twinx()
-# ax2.set_ylabel("extra-SP_SPX", color='tab:green')
-# ax2.plot(df['time'], 
-#         df['extra-SP_SPX_(TVC_US03Y+3.5-0.5_ECONOMICS_USGDPYY)_ECONOMICS_USM2_10000000000'], 
-#         marker='s', linestyle=':', 
-#         color='tab:green', label='SP_SPX')
+ax2 = ax.twinx()
+ax2.set_ylabel("extra-SP_SPX", color='tab:green')
+ax2.plot(df['time'], 
+        df['extra-SP_SPX_(TVC_US03Y+3.5-0.5_ECONOMICS_USGDPYY)_ECONOMICS_USM2_10000000000'], 
+        marker='s', linestyle=':', 
+        color='tab:green', label='SP_SPX')
 
 # Третья ось (правая смещённая) - extra-MULTPL
 ax3 = ax.twinx()
@@ -137,6 +137,8 @@ ax.legend(lines, labels, loc='upper left', bbox_to_anchor=(1.15, 1))
 
 plt.tight_layout()
 plt.savefig("extra_metrics_plot.png")
+plt.grid(True)
+plt.show()
 
 
 

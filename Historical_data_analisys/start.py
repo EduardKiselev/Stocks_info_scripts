@@ -11,7 +11,7 @@ def name_from_file(file_name: str):
 
 
 # HYPERPARAMS
-MA_WINDOW_FOR_EXTRAS = 300
+MA_WINDOW_FOR_EXTRAS = 400
 LOW_QUANTILE = 0.20
 HIGH_QUANTILE = 0.80
 ICHIMOKY_MULT = 2
@@ -103,7 +103,6 @@ for column in column_pairs:
     flag_name = flag_type + "-" + index_name
     print(flag_type)
     if flag_type == "extra":
-
         index_column = [col for col in final_df.columns if index_name in col][0]
 
         final_df[flag_name+"_LOW"] = final_df[index_column].rolling(
@@ -120,7 +119,6 @@ for column in column_pairs:
                       (final_df[index_column] < final_df[flag_name+"_LOW"])]
 
         choices = column_pairs[column][2:4]
-
         final_df[flag_name] = np.select(conditions, choices, default=0)
 
     if flag_type == "cross":
@@ -134,25 +132,32 @@ for column in column_pairs:
         choices = column_pairs[column][2:4]
         final_df[flag_name] = np.select(conditions, choices, default=0)
 
+
 # Ichimoky
 high_col = [col for col in final_df.columns if "SPX" in col and "high" in col][0]
 close_col = [col for col in final_df.columns if "SPX close" in col][0]
 low_col = [col for col in final_df.columns if "SPX" in col and "low" in col][0]
 
+tenkan=1*ICHIMOKY_MULT
+kijun=3*ICHIMOKY_MULT
+senkou=5*ICHIMOKY_MULT
+
 ichimoku = ta.ichimoku(
     final_df[high_col], final_df[low_col], final_df[close_col],
-    tenkan=1*ICHIMOKY_MULT, kijun=2*ICHIMOKY_MULT, senkou=4*ICHIMOKY_MULT, include_chikou=False
+    tenkan=tenkan, kijun=kijun, senkou=senkou, include_chikou=False
 )
 final_df = pd.concat([final_df, ichimoku[0]], axis=1)
 final_df["cloud_flag"] = 0
 print(close_col)
-final_df.loc[final_df[close_col] > final_df["ISA_2"], "cloud_flag"] = 1
-final_df.loc[final_df[close_col] < final_df["ISB_4"], "cloud_flag"] = -1
+final_df.loc[final_df[close_col] > final_df["ISA_"+str(tenkan)], "cloud_flag"] = 1
+final_df.loc[final_df[close_col] < final_df["ISB_"+str(kijun)], "cloud_flag"] = -1
 # help(ta.ichimoku)
 
 final_df = final_df[final_df["time"] > 900]
 final_df["time"] = final_df["time"]*10**6
 final_df['time'] = pd.to_datetime(final_df['time'], unit='s').dt.normalize()
 final_df["SPX close"] = final_df["SPX close"].apply(math.log10)
+
+
 final_df.to_csv("temp.csv")
 print(final_df)
